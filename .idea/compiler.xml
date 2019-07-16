@@ -9,8 +9,5 @@
         <module name="SonarReport" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="SonarReport" target="1.8" />
-    </bytecodeTargetLevel>
   </component>
 </project>

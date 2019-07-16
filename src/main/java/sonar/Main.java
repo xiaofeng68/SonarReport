@@ -3,6 +3,7 @@ package sonar;
 import io.vavr.control.Try;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
+import org.apache.commons.io.FileUtils;
 import sonar.dao.SonarDAO;
 import sonar.entities.Statistics;
 import sonar.utils.$;
@@ -41,7 +42,9 @@ public class Main {
         }
 
         val file = new File(fileName);
-        if (file.exists()) throw new FileAlreadyExistsException(fileName + "已经存在了！请换个别的名字吧");
+        if (file.exists()) {
+            file.delete();
+        }
 
         log.info("正在从系统上读取数据....");
         val stats = generateStats(baseUrl);
@@ -63,12 +66,13 @@ public class Main {
     }
 
     private static void printHelp() {
-        log.info("第一个参数（必须）：输入sonar的地址，如http://127.0.0.1:9000，注意以【http://】开头，结尾不能添加【/】");
+        log.info("第一个参数（必须）：输入sonar的地址，如http://10.16.128.39:9000，注意以【http://】开头，结尾不能添加【/】");
         log.info("第二个参数（可选）：输入要生成的报告文件名称");
     }
 
     private static List<Statistics> generateStats(String baseUrl) {
         try (val dao = new SonarDAO(baseUrl)) {
+            dao.login();
             val projects = dao.listProjects();
             val stats = new ArrayList<Statistics>();
             for (val project : projects) {

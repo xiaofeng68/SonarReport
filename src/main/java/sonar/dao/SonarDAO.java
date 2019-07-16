@@ -4,27 +4,35 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
+import org.apache.http.Header;
 import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.cookie.Cookie;
+import org.apache.http.entity.InputStreamEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicNameValuePair;
 import sonar.entities.Project;
 import sonar.entities.User;
 import sonar.respond_entities.FacetsRespond;
 import sonar.respond_entities.ProjectsRespond;
 import sonar.respond_entities.UsersRespond;
+import sonar.respond_entities.Value;
 import sonar.utils.$;
+import sun.rmi.runtime.Log;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,6 +44,7 @@ public class SonarDAO implements Closeable {
     private final HttpClient client;
     private final HttpClientConnectionManager manager;
     private final String baseUrl;
+    private static String cookie;
     private static Gson jsonParser = new GsonBuilder().create();
     private static Properties prop = $.getProperties("/sonar-api-url.properties");
 
@@ -70,11 +79,49 @@ public class SonarDAO implements Closeable {
         $.checkNonNull(baseUrl, client, propKey, c, args);
         $.checkNonBlank(baseUrl, propKey);
         val api = baseUrl + MessageFormat.format(prop.getProperty(propKey), args);
-        HttpResponse response = client.execute(new HttpGet(api));
+        HttpGet get = new HttpGet(api);
+        get.setHeader("cookie",cookie);
+        HttpResponse response = client.execute(get);
         val json = new InputStreamReader(response.getEntity().getContent());
         return jsonParser.fromJson(json, c);
     }
-
+    /**
+     * 列出Sonar中的所有项目
+     */
+    public void login() {
+        try {
+            HttpClientContext context = HttpClientContext.create();
+            HttpPost httppost = new HttpPost(baseUrl+prop.get("login_url"));
+            List<NameValuePair> nvps = new ArrayList<NameValuePair>();
+            nvps.add(new BasicNameValuePair("login", prop.get("login_name").toString()));
+            nvps.add(new BasicNameValuePair("password", prop.get("login_password").toString()));
+            httppost.setEntity(new UrlEncodedFormEntity(nvps, StandardCharsets.UTF_8));
+            HttpResponse response = client.execute(httppost);
+            if (response.getStatusLine().getStatusCode() != org.apache.http.HttpStatus.SC_OK) {
+                log.info( "not send "+response.getStatusLine());
+            }else{
+                log.info("send ok "+response.getStatusLine());
+                Header[] responseHeader = response.getHeaders("Set-Cookie");
+                int length = responseHeader.length;
+                StringBuilder stringBuilder = new StringBuilder();
+                for (int i = 0; i < length; i++) {
+                    if (responseHeader[i] != null) {
+                        if ("Set-Cookie".equals(responseHeader[i].getName())) {
+                            int index = responseHeader[i].getValue().indexOf(";");
+                            if (i == length - 1) {
+                                stringBuilder.append(responseHeader[i].getValue().substring(0, index));
+                            } else {
+                                stringBuilder.append(responseHeader[i].getValue().substring(0, index) + "; ");
+                            }
+                        }
+                    }
+                }
+                cookie = stringBuilder.toString();
+            }
+        } catch (IOException e) {
+            log.error("登录失败"+e.getMessage());
+        }
+    }
     /**
      * 列出Sonar中的所有项目
      */

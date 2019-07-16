@@ -13,7 +13,7 @@ class SonarDAOTest {
 
     @BeforeEach
     void setUp() {
-        dao = new SonarDAO("http://192.168.1.10:9000");
+        dao = new SonarDAO("http://:9000");
     }
 
     @AfterEach
