@@ -7,27 +7,18 @@ import lombok.val;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.cookie.Cookie;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicNameValuePair;
-import sonar.entities.Project;
-import sonar.entities.User;
-import sonar.respond_entities.FacetsRespond;
-import sonar.respond_entities.ProjectsRespond;
-import sonar.respond_entities.UsersRespond;
-import sonar.respond_entities.Value;
+import sonar.entities.*;
+import sonar.respond_entities.*;
 import sonar.utils.$;
-import sun.rmi.runtime.Log;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -140,6 +131,38 @@ public class SonarDAO implements Closeable {
     public List<User> listUsers() {
         try {
             return execute(baseUrl, client, "search_users", UsersRespond.class).getUsers();
+        } catch (IOException e) {
+            log.error(e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 获取项目下的问题
+     * @return
+     */
+    public List<Issues> listIssues(Object... args) {
+        try {
+            List<Issues> list = new ArrayList<>();
+            IssuesResponse response =  execute(baseUrl, client, "get_project_issues", IssuesResponse.class,args);
+            list.addAll(response.getIssues());
+            int total = response.getTotal();
+            int p = response.getP();
+            int page = total%500==0?total/500:total/500+1;
+            while (p<page){
+                args[3]=p++;
+                response =  execute(baseUrl, client, "get_project_issues", IssuesResponse.class,args);
+                list.addAll(response.getIssues());
+            }
+            return list;
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    public List<Times> listTimes(Object... args) {
+        try {
+            return execute(baseUrl, client, "get_project_time", TimesResponse.class,args).getMeasures().get(0).getHistory();
         } catch (IOException e) {
             log.error(e.getMessage(), e);
             return new ArrayList<>();
